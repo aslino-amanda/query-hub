@@ -270,40 +270,64 @@ with tab_catalogo:
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# TAB APROVAÇÃO
+# TAB APROVAÇÃO — protegida por senha
 # ════════════════════════════════════════════════════════════════════════════
 with tab_aprovacao:
-    pendentes_list = get_queries(status="pendente")
+    if "aprovacao_autenticada" not in st.session_state:
+        st.session_state["aprovacao_autenticada"] = False
 
-    if not pendentes_list:
-        st.success("Nenhuma query aguardando aprovação. 🎉")
+    if not st.session_state["aprovacao_autenticada"]:
+        st.markdown("##### Acesso restrito ao time de automação")
+        senha_input = st.text_input("Senha", type="password", placeholder="Digite a senha do time")
+        if st.button("Entrar", type="primary"):
+            try:
+                senha_correta = st.secrets["aprovacao"]["senha"]
+            except:
+                senha_correta = ""
+            if senha_input == senha_correta:
+                st.session_state["aprovacao_autenticada"] = True
+                st.rerun()
+            else:
+                st.error("Senha incorreta.")
     else:
-        for q in pendentes_list:
-            with st.expander(f"**{q['nome']}**  ·  submetida por {q['autor'] or 'anônimo'}"):
-                st.markdown(f"**Descrição:** {q['descricao'] or '—'}")
-                st.markdown(f"**Área:** `{q['area']}`  ·  **Tabelas:** `{q['tabelas'] or '—'}`")
-                st.code(q["sql_texto"], language="sql")
+        col_titulo, col_sair = st.columns([5, 1])
+        with col_titulo:
+            st.markdown("##### Queries aguardando aprovação")
+        with col_sair:
+            if st.button("Sair"):
+                st.session_state["aprovacao_autenticada"] = False
+                st.rerun()
 
-                # Testar antes de aprovar
-                if metabase_disponivel():
-                    if st.button("🧪 Testar query", key=f"test_{q['id']}"):
-                        with st.spinner("Testando..."):
-                            df, erro = executar_no_starrocks(q["sql_texto"])
-                        if erro:
-                            st.error(f"Query com erro: {erro}")
-                        else:
-                            st.success(f"Query OK — {len(df)} linhas retornadas")
-                            st.dataframe(df.head(10), use_container_width=True)
+        pendentes_list = get_queries(status="pendente")
 
-                col_ap, col_rej, _ = st.columns([1, 1, 4])
-                with col_ap:
-                    if st.button("✅ Aprovar", key=f"ap_{q['id']}", type="primary"):
-                        aprovar_query(q["id"])
-                        st.rerun()
-                with col_rej:
-                    if st.button("❌ Rejeitar", key=f"rej_{q['id']}"):
-                        rejeitar_query(q["id"])
-                        st.rerun()
+        if not pendentes_list:
+            st.success("Nenhuma query aguardando aprovação. 🎉")
+        else:
+            for q in pendentes_list:
+                with st.expander(f"**{q['nome']}**  ·  submetida por {q['autor'] or 'anônimo'}"):
+                    st.markdown(f"**Descrição:** {q['descricao'] or '—'}")
+                    st.markdown(f"**Área:** `{q['area']}`  ·  **Tabelas:** `{q['tabelas'] or '—'}`")
+                    st.code(q["sql_texto"], language="sql")
+
+                    if metabase_disponivel():
+                        if st.button("🧪 Testar query", key=f"test_{q['id']}"):
+                            with st.spinner("Testando..."):
+                                df, erro = executar_no_starrocks(q["sql_texto"])
+                            if erro:
+                                st.error(f"Query com erro: {erro}")
+                            else:
+                                st.success(f"Query OK — {len(df)} linhas retornadas")
+                                st.dataframe(df.head(10), use_container_width=True)
+
+                    col_ap, col_rej, _ = st.columns([1, 1, 4])
+                    with col_ap:
+                        if st.button("✅ Aprovar", key=f"ap_{q['id']}", type="primary"):
+                            aprovar_query(q["id"])
+                            st.rerun()
+                    with col_rej:
+                        if st.button("❌ Rejeitar", key=f"rej_{q['id']}"):
+                            rejeitar_query(q["id"])
+                            st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -313,21 +337,31 @@ with tab_submeter:
     st.markdown("##### Sugira uma query para o catálogo")
     st.caption("O time de automação vai revisar antes de publicar.")
 
-    with st.form("form_query"):
-        nome      = st.text_input("Nome da query *", placeholder="ex: Churn semanal por plano")
-        descricao = st.text_area("Descrição", placeholder="O que essa query retorna? Quando usar?", height=80)
-        col_a, col_b = st.columns(2)
-        with col_a:
-            area = st.selectbox("Área *", ["dados", "automacao", "engenharia", "logistica", "atendimento", "financeiro", "parceria", "crm"])
-        with col_b:
-            tabelas = st.text_input("Tabelas usadas", placeholder="ex: orders, merchants")
-        autor     = st.text_input("Seu nome", placeholder="ex: João Silva")
-        sql_texto = st.text_area("SQL *", placeholder="SELECT ...", height=200)
+    if "form_enviado" not in st.session_state:
+        st.session_state["form_enviado"] = False
 
-        submitted = st.form_submit_button("Enviar para aprovação", type="primary", use_container_width=True)
-        if submitted:
-            if not nome or not sql_texto:
-                st.error("Nome e SQL são obrigatórios.")
-            else:
-                submeter_query(nome, descricao, sql_texto, area, tabelas, autor)
-                st.success("Query enviada! O time vai revisar em breve. 🚀")
+    if st.session_state["form_enviado"]:
+        st.success("Query enviada! O time vai revisar em breve. 🚀")
+        if st.button("Enviar outra query"):
+            st.session_state["form_enviado"] = False
+            st.rerun()
+    else:
+        with st.form("form_query", clear_on_submit=True):
+            nome      = st.text_input("Nome da query *", placeholder="ex: Churn semanal por plano")
+            descricao = st.text_area("Descrição", placeholder="O que essa query retorna? Quando usar?", height=80)
+            col_a, col_b = st.columns(2)
+            with col_a:
+                area = st.selectbox("Área *", ["dados", "automacao", "engenharia", "logistica", "atendimento", "financeiro", "parceria", "crm"])
+            with col_b:
+                tabelas = st.text_input("Tabelas usadas", placeholder="ex: orders, merchants")
+            autor     = st.text_input("Seu nome", placeholder="ex: João Silva")
+            sql_texto = st.text_area("SQL *", placeholder="SELECT ...", height=200)
+
+            submitted = st.form_submit_button("Enviar para aprovação", type="primary", use_container_width=True)
+            if submitted:
+                if not nome or not sql_texto:
+                    st.error("Nome e SQL são obrigatórios.")
+                else:
+                    submeter_query(nome, descricao, sql_texto, area, tabelas, autor)
+                    st.session_state["form_enviado"] = True
+                    st.rerun()
