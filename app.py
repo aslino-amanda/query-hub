@@ -24,12 +24,14 @@ st.markdown("""
         font-weight: 500;
         margin-right: 6px;
     }
-    .badge-produto    { background:#FEF3C7; color:#92400E; }
-    .badge-financeiro { background:#D1FAE5; color:#065F46; }
-    .badge-marketing  { background:#EDE9FE; color:#4C1D95; }
-    .badge-ops        { background:#FEE2E2; color:#991B1B; }
-    .badge-dados      { background:#DBEAFE; color:#1E40AF; }
-    .badge-outros     { background:#F3F4F6; color:#374151; }
+    .badge-dados        { background:#DBEAFE; color:#1E40AF; }
+    .badge-automacao    { background:#EDE9FE; color:#4C1D95; }
+    .badge-engenharia   { background:#D1FAE5; color:#065F46; }
+    .badge-logistica    { background:#FEF3C7; color:#92400E; }
+    .badge-atendimento  { background:#FCE7F3; color:#9D174D; }
+    .badge-financeiro   { background:#ECFDF5; color:#065F46; }
+    .badge-parceria     { background:#FEE2E2; color:#991B1B; }
+    .badge-crm          { background:#FFF7ED; color:#92400E; }
     .meta { font-size: 12px; color: #999; margin-top: 6px; }
 </style>
 """, unsafe_allow_html=True)
@@ -157,11 +159,16 @@ def executar_no_starrocks(sql_texto):
 # ── Init ──────────────────────────────────────────────────────────────────────
 init_db()
 
-AREAS = ["todos", "produto", "financeiro", "marketing", "ops", "dados", "outros"]
+AREAS = ["todos", "dados", "automacao", "engenharia", "logistica", "atendimento", "financeiro", "parceria", "crm"]
 BADGE_CLASS = {
-    "produto": "badge-produto", "financeiro": "badge-financeiro",
-    "marketing": "badge-marketing", "ops": "badge-ops",
-    "dados": "badge-dados", "outros": "badge-outros",
+    "dados":        "badge-dados",
+    "automacao":    "badge-automacao",
+    "engenharia":   "badge-engenharia",
+    "logistica":    "badge-logistica",
+    "atendimento":  "badge-atendimento",
+    "financeiro":   "badge-financeiro",
+    "parceria":     "badge-parceria",
+    "crm":          "badge-crm",
 }
 
 # ── Header ────────────────────────────────────────────────────────────────────
@@ -297,7 +304,7 @@ with tab_submeter:
         descricao = st.text_area("Descrição", placeholder="O que essa query retorna? Quando usar?", height=80)
         col_a, col_b = st.columns(2)
         with col_a:
-            area = st.selectbox("Área *", ["produto", "financeiro", "marketing", "ops", "dados", "outros"])
+            area = st.selectbox("Área *", ["dados", "automacao", "engenharia", "logistica", "atendimento", "financeiro", "parceria", "crm"])
         with col_b:
             tabelas = st.text_input("Tabelas usadas", placeholder="ex: orders, merchants")
         autor     = st.text_input("Seu nome", placeholder="ex: João Silva")
