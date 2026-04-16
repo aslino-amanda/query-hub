@@ -63,26 +63,7 @@ def init_db():
             copiado_em  TEXT DEFAULT (datetime('now'))
         );
     """)
-    cur = conn.execute("SELECT COUNT(*) FROM queries WHERE status='aprovada'")
-    if cur.fetchone()[0] == 0:
-        exemplos = [
-            ("GMV diário por canal", "Receita bruta por canal de venda com breakdown diário.",
-             "SELECT\n  DATE(created_at) AS data,\n  channel,\n  SUM(order_value) AS gmv\nFROM orders\nWHERE status = 'completed'\n  AND created_at >= CURRENT_DATE - INTERVAL 30 DAY\nGROUP BY 1, 2\nORDER BY 1 DESC;",
-             "produto", "orders, channels", "Time de Automação", "aprovada", 89),
-            ("Churn de lojistas — mensal", "Taxa de cancelamento por plano e segmento no mês de referência.",
-             "SELECT\n  plan_name,\n  segment,\n  COUNT(*) AS cancelamentos\nFROM merchant_monthly_summary\nWHERE ref_month = DATE_FORMAT(CURRENT_DATE - INTERVAL 1 MONTH, '%Y-%m-01')\nGROUP BY 1, 2;",
-             "financeiro", "merchants, subscriptions", "Time de Automação", "aprovada", 61),
-            ("SLA de integrações por parceiro", "Tempo médio de resposta e taxa de erro por parceiro nos últimos 7 dias.",
-             "SELECT\n  partner_name,\n  AVG(response_ms) AS avg_response_ms,\n  COUNT(*) AS total_calls\nFROM integration_logs\nWHERE created_at >= CURRENT_DATE - INTERVAL 7 DAY\nGROUP BY 1\nORDER BY avg_response_ms DESC;",
-             "ops", "integration_logs", "Time de Automação", "aprovada", 44),
-            ("Ticket médio por segmento", "Valor médio de pedido agrupado por segmento de lojista.",
-             "SELECT\n  m.segment,\n  AVG(o.order_value) AS ticket_medio,\n  COUNT(o.id) AS total_pedidos\nFROM orders o\nJOIN merchants m ON o.merchant_id = m.id\nWHERE o.created_at >= CURRENT_DATE - INTERVAL 30 DAY\nGROUP BY 1\nORDER BY ticket_medio DESC;",
-             "financeiro", "orders, merchants", "Time de Automação", "aprovada", 33),
-        ]
-        conn.executemany(
-            "INSERT INTO queries (nome, descricao, sql_texto, area, tabelas, autor, status, usos) VALUES (?,?,?,?,?,?,?,?)",
-            exemplos
-        )
+
     conn.commit()
     conn.close()
 
