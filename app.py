@@ -123,33 +123,47 @@ def get_stats():
     return total, areas, usos_mes, pendentes
 
 
-# ── Execução no StarRocks ─────────────────────────────────────────────────────
-def starrocks_disponivel():
+# ── Execução via API Metabase ─────────────────────────────────────────────────
+METABASE_URL = "https://metabase.network.awsli.com.br"
+METABASE_DB_ID = 11
+
+def metabase_disponivel():
     try:
-        s = st.secrets["starrocks"]
-        return all(k in s for k in ["host", "port", "user", "password", "database"])
+        s = st.secrets["metabase"]
+        return "api_key" in s
     except:
         return False
 
 def executar_no_starrocks(sql_texto):
     try:
-        import mysql.connector
-        s = st.secrets["starrocks"]
-        conn = mysql.connector.connect(
-            host=s["host"],
-            port=int(s["port"]),
-            user=s["user"],
-            password=s["password"],
-            database=s["database"],
-            connection_timeout=10,
+        import urllib.request
+        import json
+        s = st.secrets["metabase"]
+        api_key = s["api_key"]
+
+        payload = json.dumps({
+            "database": METABASE_DB_ID,
+            "native":   {"query": sql_texto},
+            "type":     "native",
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            f"{METABASE_URL}/api/dataset",
+            data=payload,
+            headers={
+                "Content-Type":  "application/json",
+                "x-api-key":     api_key,
+            },
+            method="POST",
         )
-        cursor = conn.cursor()
-        cursor.execute(sql_texto)
-        rows = cursor.fetchmany(500)
-        cols = [d[0] for d in cursor.description] if cursor.description else []
-        conn.close()
-        if not cols:
-            return None, "Query executada mas não retornou colunas."
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        if "error" in data:
+            return None, data["error"]
+
+        cols = [c["display_name"] for c in data["data"]["cols"]]
+        rows = data["data"]["rows"][:500]
         df = pd.DataFrame(rows, columns=cols)
         return df, None
     except Exception as e:
@@ -189,9 +203,9 @@ c2.metric("Áreas cobertas", areas)
 c3.metric("Usos registrados", usos_mes)
 c4.metric("Aguardando aprovação", pendentes)
 
-# ── Aviso StarRocks ───────────────────────────────────────────────────────────
-if not starrocks_disponivel():
-    st.info("💡 Execução de queries desativada — configure as credenciais do StarRocks em Settings → Secrets para ativar.")
+# ── Aviso Metabase ────────────────────────────────────────────────────────────
+if not metabase_disponivel():
+    st.info("💡 Execução de queries desativada — configure a chave de API do Metabase em Settings → Secrets para ativar.")
 
 st.divider()
 
@@ -236,8 +250,8 @@ with tab_catalogo:
                 st.code(q["sql_texto"], language="sql")
 
                 # ── Botão Executar ──
-                if starrocks_disponivel():
-                    if st.button("▶ Executar no StarRocks", key=f"run_{q['id']}", type="primary"):
+                if metabase_disponivel():
+                    if st.button("▶ Executar no Metabase", key=f"run_{q['id']}", type="primary"):
                         with st.spinner("Executando query..."):
                             df, erro = executar_no_starrocks(q["sql_texto"])
                         if erro:
@@ -271,7 +285,7 @@ with tab_aprovacao:
                 st.code(q["sql_texto"], language="sql")
 
                 # Testar antes de aprovar
-                if starrocks_disponivel():
+                if metabase_disponivel():
                     if st.button("🧪 Testar query", key=f"test_{q['id']}"):
                         with st.spinner("Testando..."):
                             df, erro = executar_no_starrocks(q["sql_texto"])
