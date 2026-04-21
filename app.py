@@ -1,7 +1,6 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-from datetime import datetime
 import os
 
 st.set_page_config(
@@ -12,32 +11,84 @@ st.set_page_config(
 
 DB_PATH = "data/queries.db"
 
-# ── CSS ──────────────────────────────────────────────────────────────────────
+# ── CSS LI Branding ───────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    .block-container { padding-top: 2rem; max-width: 960px; }
+    :root {
+        --li-turquesa: #00C4A0;
+        --li-roxo: #6B2FA0;
+        --li-turquesa-light: #E6FAF6;
+        --li-roxo-light: #F0E8F8;
+        --li-turquesa-dark: #00957A;
+        --li-roxo-dark: #4E1F78;
+    }
+    .block-container { padding-top: 0 !important; max-width: 1100px; }
+    .hero-banner {
+        background: linear-gradient(135deg, #00C4A0 0%, #6B2FA0 100%);
+        padding: 28px 32px;
+        border-radius: 0 0 16px 16px;
+        margin-bottom: 1.5rem;
+        color: white;
+    }
+    .hero-title { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+    .hero-sub { font-size: 14px; opacity: .85; }
     .badge {
         display: inline-block;
-        padding: 2px 10px;
+        padding: 3px 10px;
         border-radius: 99px;
         font-size: 11px;
         font-weight: 500;
         margin-right: 6px;
     }
-    .badge-dados        { background:#DBEAFE; color:#1E40AF; }
-    .badge-automacao    { background:#EDE9FE; color:#4C1D95; }
-    .badge-engenharia   { background:#D1FAE5; color:#065F46; }
-    .badge-logistica    { background:#FEF3C7; color:#92400E; }
-    .badge-atendimento  { background:#FCE7F3; color:#9D174D; }
-    .badge-financeiro   { background:#ECFDF5; color:#065F46; }
-    .badge-parceria     { background:#FEE2E2; color:#991B1B; }
-    .badge-crm          { background:#FFF7ED; color:#92400E; }
-    .meta { font-size: 12px; color: #999; margin-top: 6px; }
+    .badge-dados        { background:#E6FAF6; color:#00957A; }
+    .badge-automacao    { background:#F0E8F8; color:#4E1F78; }
+    .badge-engenharia   { background:#E8F4FF; color:#1a5fa5; }
+    .badge-logistica    { background:#FFF8E6; color:#92500E; }
+    .badge-atendimento  { background:#FFF0F6; color:#9D174D; }
+    .badge-financeiro   { background:#F0FFF4; color:#1a6b3c; }
+    .badge-parceria     { background:#FFF0F0; color:#991B1B; }
+    .badge-crm          { background:#FFF5ED; color:#92400E; }
+    .meta { font-size: 12px; color: #888; margin-top: 6px; }
+    .stButton > button {
+        border-radius: 8px !important;
+    }
+    .stButton > button[kind="primary"] {
+        background-color: var(--li-turquesa) !important;
+        border-color: var(--li-turquesa) !important;
+        color: white !important;
+    }
+    .stButton > button[kind="primary"]:hover {
+        background-color: var(--li-turquesa-dark) !important;
+        border-color: var(--li-turquesa-dark) !important;
+    }
+    .stTextInput > div > div > input:focus {
+        border-color: var(--li-turquesa) !important;
+        box-shadow: 0 0 0 1px var(--li-turquesa) !important;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 4px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px 8px 0 0 !important;
+    }
+    .stTabs [aria-selected="true"] {
+        color: var(--li-roxo) !important;
+        border-bottom-color: var(--li-roxo) !important;
+    }
+    .info-box {
+        background: #E6FAF6;
+        border-left: 3px solid #00C4A0;
+        padding: 10px 14px;
+        border-radius: 0 8px 8px 0;
+        font-size: 13px;
+        color: #00957A;
+        margin-bottom: 1rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ── Banco de dados (catálogo) ─────────────────────────────────────────────────
+# ── Banco de dados ────────────────────────────────────────────────────────────
 def get_db():
     os.makedirs("data", exist_ok=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -52,7 +103,7 @@ def init_db():
             nome        TEXT NOT NULL,
             descricao   TEXT,
             sql_texto   TEXT NOT NULL,
-            area        TEXT DEFAULT 'outros',
+            area        TEXT DEFAULT 'dados',
             tabelas     TEXT,
             autor       TEXT,
             status      TEXT DEFAULT 'pendente',
@@ -65,7 +116,6 @@ def init_db():
             copiado_em  TEXT DEFAULT (datetime('now'))
         );
     """)
-
     conn.commit()
     conn.close()
 
@@ -117,10 +167,10 @@ def get_stats():
     conn = get_db()
     total     = conn.execute("SELECT COUNT(*) FROM queries WHERE status='aprovada'").fetchone()[0]
     areas     = conn.execute("SELECT COUNT(DISTINCT area) FROM queries WHERE status='aprovada'").fetchone()[0]
-    usos_mes  = conn.execute("SELECT COALESCE(SUM(usos),0) FROM queries WHERE status='aprovada'").fetchone()[0]
+    usos      = conn.execute("SELECT COALESCE(SUM(usos),0) FROM queries WHERE status='aprovada'").fetchone()[0]
     pendentes = conn.execute("SELECT COUNT(*) FROM queries WHERE status='pendente'").fetchone()[0]
     conn.close()
-    return total, areas, usos_mes, pendentes
+    return total, areas, usos, pendentes
 
 
 # ── Execução via API Metabase ─────────────────────────────────────────────────
@@ -134,38 +184,28 @@ def metabase_disponivel():
     except:
         return False
 
-def executar_no_starrocks(sql_texto):
+def executar_no_metabase(sql_texto):
     try:
-        import urllib.request
-        import json
+        import urllib.request, json
         s = st.secrets["metabase"]
-        api_key = s["api_key"]
-
         payload = json.dumps({
             "database": METABASE_DB_ID,
             "native":   {"query": sql_texto},
             "type":     "native",
         }).encode("utf-8")
-
         req = urllib.request.Request(
             f"{METABASE_URL}/api/dataset",
             data=payload,
-            headers={
-                "Content-Type":  "application/json",
-                "x-api-key":     api_key,
-            },
+            headers={"Content-Type": "application/json", "x-api-key": s["api_key"]},
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-
         if "error" in data:
             return None, data["error"]
-
         cols = [c["display_name"] for c in data["data"]["cols"]]
         rows = data["data"]["rows"][:500]
-        df = pd.DataFrame(rows, columns=cols)
-        return df, None
+        return pd.DataFrame(rows, columns=cols), None
     except Exception as e:
         return None, str(e)
 
@@ -173,67 +213,68 @@ def executar_no_starrocks(sql_texto):
 # ── Init ──────────────────────────────────────────────────────────────────────
 init_db()
 
-# ── Login ─────────────────────────────────────────────────────────────────────
+# ── Login geral ───────────────────────────────────────────────────────────────
 def check_login():
     if "logado" not in st.session_state:
         st.session_state["logado"] = False
     return st.session_state["logado"]
 
 def tela_login():
-    st.markdown("## 🗄️ Query Hub")
-    st.caption("Loja Integrada · Time de Automação")
-    st.divider()
-    st.markdown("##### Acesso restrito")
-    st.caption("Digite a senha para acessar o repositório de queries.")
-    senha = st.text_input("Senha", type="password", placeholder="Digite sua senha")
-    if st.button("Entrar", type="primary", use_container_width=True):
-        try:
-            senha_correta = st.secrets["acesso"]["senha"]
-        except:
-            senha_correta = ""
-        if senha == senha_correta:
-            st.session_state["logado"] = True
-            st.rerun()
-        else:
-            st.error("Senha incorreta. Tente novamente.")
+    col1, col2, col3 = st.columns([1, 1.5, 1])
+    with col2:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#00C4A0,#6B2FA0);padding:28px;border-radius:16px;text-align:center;color:white;margin:2rem 0 1.5rem">
+            <div style="font-size:32px;margin-bottom:8px">🗄️</div>
+            <div style="font-size:20px;font-weight:600;margin-bottom:4px">Query Hub</div>
+            <div style="font-size:13px;opacity:.85">Loja Integrada · Time de Automação</div>
+        </div>
+        """, unsafe_allow_html=True)
+        senha = st.text_input("Senha de acesso", type="password", placeholder="Digite a senha")
+        if st.button("Entrar", type="primary", use_container_width=True):
+            try:
+                senha_correta = st.secrets["acesso"]["senha"]
+            except:
+                senha_correta = ""
+            if senha == senha_correta:
+                st.session_state["logado"] = True
+                st.rerun()
+            else:
+                st.error("Senha incorreta. Tente novamente.")
+        st.caption("Acesso restrito aos colaboradores da Loja Integrada.")
     st.stop()
 
 if not check_login():
     tela_login()
 
+# ── Constantes ────────────────────────────────────────────────────────────────
 AREAS = ["todos", "dados", "automacao", "engenharia", "logistica", "atendimento", "financeiro", "parceria", "crm"]
 BADGE_CLASS = {
-    "dados":        "badge-dados",
-    "automacao":    "badge-automacao",
-    "engenharia":   "badge-engenharia",
-    "logistica":    "badge-logistica",
-    "atendimento":  "badge-atendimento",
-    "financeiro":   "badge-financeiro",
-    "parceria":     "badge-parceria",
-    "crm":          "badge-crm",
+    "dados": "badge-dados", "automacao": "badge-automacao",
+    "engenharia": "badge-engenharia", "logistica": "badge-logistica",
+    "atendimento": "badge-atendimento", "financeiro": "badge-financeiro",
+    "parceria": "badge-parceria", "crm": "badge-crm",
 }
 
-# ── Header ────────────────────────────────────────────────────────────────────
-col_logo, col_btn = st.columns([5, 1])
-with col_logo:
-    st.markdown("## 🗄️ Query Hub")
-    st.caption("Loja Integrada · Time de Automação")
-with col_btn:
-    st.write("")
-    if st.button("＋ Sugerir query", use_container_width=True):
-        st.session_state["show_form"] = True
+# ── Hero Banner ───────────────────────────────────────────────────────────────
+total, areas, usos, pendentes = get_stats()
+
+st.markdown(f"""
+<div class="hero-banner">
+    <div class="hero-title">🗄️ Query Hub</div>
+    <div class="hero-sub">Repositório central de queries SQL · Loja Integrada · Time de Automação</div>
+</div>
+""", unsafe_allow_html=True)
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
-total, areas, usos_mes, pendentes = get_stats()
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Queries aprovadas", total)
-c2.metric("Áreas cobertas", areas)
-c3.metric("Usos registrados", usos_mes)
+c2.metric("Times cobertos", areas)
+c3.metric("Usos registrados", usos)
 c4.metric("Aguardando aprovação", pendentes)
-
-# ── Aviso Metabase ────────────────────────────────────────────────────────────
-if not metabase_disponivel():
-    st.info("💡 Execução de queries desativada — configure a chave de API do Metabase em Settings → Secrets para ativar.")
+with c5:
+    st.write("")
+    if st.button("＋ Sugerir query", use_container_width=True):
+        st.session_state["aba_ativa"] = "submeter"
 
 st.divider()
 
@@ -251,9 +292,10 @@ tab_catalogo, tab_aprovacao, tab_submeter = st.tabs([
 with tab_catalogo:
     col_busca, col_area = st.columns([3, 1])
     with col_busca:
-        busca = st.text_input("", placeholder="🔍  Buscar por nome, tabela, área... ex: churn, gmv, pedidos", label_visibility="collapsed")
+        busca = st.text_input("", placeholder="🔍  Buscar por nome, tabela ou área... ex: churn, gmv, pedidos", label_visibility="collapsed")
     with col_area:
-        area_sel = st.selectbox("Área", AREAS, label_visibility="collapsed")
+        area_sel = st.selectbox("", AREAS, label_visibility="collapsed",
+            format_func=lambda x: "Todos os times" if x == "todos" else x.capitalize())
 
     queries = get_queries(area=area_sel if area_sel != "todos" else None, busca=busca or None)
 
@@ -261,7 +303,7 @@ with tab_catalogo:
         st.info("Nenhuma query encontrada. Tente outro termo ou área.")
     else:
         for q in queries:
-            badge_cls = BADGE_CLASS.get(q["area"], "badge-outros")
+            badge_cls = BADGE_CLASS.get(q["area"], "badge-dados")
             with st.expander(f"**{q['nome']}**  ·  {q['descricao'] or ''}"):
                 col_info, col_acoes = st.columns([4, 1])
                 with col_info:
@@ -277,13 +319,12 @@ with tab_catalogo:
 
                 st.code(q["sql_texto"], language="sql")
 
-                # ── Botão Executar ──
                 if metabase_disponivel():
                     if st.button("▶ Executar no Metabase", key=f"run_{q['id']}", type="primary"):
-                        with st.spinner("Executando query..."):
-                            df, erro = executar_no_starrocks(q["sql_texto"])
+                        with st.spinner("Executando query no StarRocks..."):
+                            df, erro = executar_no_metabase(q["sql_texto"])
                         if erro:
-                            st.error(f"Erro ao executar: {erro}")
+                            st.error(f"Erro: {erro}")
                         else:
                             st.success(f"{len(df)} linhas retornadas")
                             st.dataframe(df, use_container_width=True)
@@ -305,18 +346,26 @@ with tab_aprovacao:
         st.session_state["aprovacao_autenticada"] = False
 
     if not st.session_state["aprovacao_autenticada"]:
-        st.markdown("##### Acesso restrito ao time de automação")
-        senha_input = st.text_input("Senha", type="password", placeholder="Digite a senha do time")
-        if st.button("Entrar", type="primary"):
-            try:
-                senha_correta = st.secrets["aprovacao"]["senha"]
-            except:
-                senha_correta = ""
-            if senha_input == senha_correta:
-                st.session_state["aprovacao_autenticada"] = True
-                st.rerun()
-            else:
-                st.error("Senha incorreta.")
+        col1, col2, col3 = st.columns([1, 1.5, 1])
+        with col2:
+            st.markdown("""
+            <div style="background:#F0E8F8;border-radius:12px;padding:20px;text-align:center;margin:1rem 0">
+                <div style="font-size:24px;margin-bottom:8px">🔐</div>
+                <div style="font-size:15px;font-weight:600;color:#4E1F78;margin-bottom:4px">Área restrita</div>
+                <div style="font-size:12px;color:#6B2FA0">Exclusivo para o time de automação</div>
+            </div>
+            """, unsafe_allow_html=True)
+            senha_ap = st.text_input("Senha do time de automação", type="password", placeholder="Digite a senha")
+            if st.button("Entrar na aprovação", type="primary", use_container_width=True):
+                try:
+                    senha_correta = st.secrets["aprovacao"]["senha"]
+                except:
+                    senha_correta = ""
+                if senha_ap == senha_correta:
+                    st.session_state["aprovacao_autenticada"] = True
+                    st.rerun()
+                else:
+                    st.error("Senha incorreta.")
     else:
         col_titulo, col_sair = st.columns([5, 1])
         with col_titulo:
@@ -338,13 +387,13 @@ with tab_aprovacao:
                     st.code(q["sql_texto"], language="sql")
 
                     if metabase_disponivel():
-                        if st.button("🧪 Testar query", key=f"test_{q['id']}"):
+                        if st.button("🧪 Testar antes de aprovar", key=f"test_{q['id']}"):
                             with st.spinner("Testando..."):
-                                df, erro = executar_no_starrocks(q["sql_texto"])
+                                df, erro = executar_no_metabase(q["sql_texto"])
                             if erro:
                                 st.error(f"Query com erro: {erro}")
                             else:
-                                st.success(f"Query OK — {len(df)} linhas retornadas")
+                                st.success(f"Query OK — {len(df)} linhas")
                                 st.dataframe(df.head(10), use_container_width=True)
 
                     col_ap, col_rej, _ = st.columns([1, 1, 4])
@@ -362,14 +411,17 @@ with tab_aprovacao:
 # TAB SUBMETER
 # ════════════════════════════════════════════════════════════════════════════
 with tab_submeter:
-    st.markdown("##### Sugira uma query para o catálogo")
-    st.caption("O time de automação vai revisar antes de publicar.")
+    st.markdown("""
+    <div class="info-box">
+        Como funciona: você sugere → time de automação revisa → query entra no catálogo para toda a empresa
+    </div>
+    """, unsafe_allow_html=True)
 
     if "form_enviado" not in st.session_state:
         st.session_state["form_enviado"] = False
 
     if st.session_state["form_enviado"]:
-        st.success("Query enviada! O time vai revisar em breve. 🚀")
+        st.success("Query enviada com sucesso! O time de automação vai revisar em breve. 🚀")
         if st.button("Enviar outra query"):
             st.session_state["form_enviado"] = False
             st.rerun()
@@ -379,10 +431,11 @@ with tab_submeter:
             descricao = st.text_area("Descrição", placeholder="O que essa query retorna? Quando usar?", height=80)
             col_a, col_b = st.columns(2)
             with col_a:
-                area = st.selectbox("Área *", ["dados", "automacao", "engenharia", "logistica", "atendimento", "financeiro", "parceria", "crm"])
+                area = st.selectbox("Time / Área *", ["dados", "automacao", "engenharia", "logistica", "atendimento", "financeiro", "parceria", "crm"],
+                    format_func=lambda x: x.capitalize())
             with col_b:
                 tabelas = st.text_input("Tabelas usadas", placeholder="ex: orders, merchants")
-            autor     = st.text_input("Seu nome", placeholder="ex: João Silva")
+            autor     = st.text_input("Seu nome", placeholder="ex: Amanda Lino")
             sql_texto = st.text_area("SQL *", placeholder="SELECT ...", height=200)
 
             submitted = st.form_submit_button("Enviar para aprovação", type="primary", use_container_width=True)
