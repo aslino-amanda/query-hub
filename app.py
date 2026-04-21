@@ -173,6 +173,34 @@ def executar_no_starrocks(sql_texto):
 # ── Init ──────────────────────────────────────────────────────────────────────
 init_db()
 
+# ── Login ─────────────────────────────────────────────────────────────────────
+def check_login():
+    if "logado" not in st.session_state:
+        st.session_state["logado"] = False
+    return st.session_state["logado"]
+
+def tela_login():
+    st.markdown("## 🗄️ Query Hub")
+    st.caption("Loja Integrada · Time de Automação")
+    st.divider()
+    st.markdown("##### Acesso restrito")
+    st.caption("Digite a senha para acessar o repositório de queries.")
+    senha = st.text_input("Senha", type="password", placeholder="Digite sua senha")
+    if st.button("Entrar", type="primary", use_container_width=True):
+        try:
+            senha_correta = st.secrets["acesso"]["senha"]
+        except:
+            senha_correta = ""
+        if senha == senha_correta:
+            st.session_state["logado"] = True
+            st.rerun()
+        else:
+            st.error("Senha incorreta. Tente novamente.")
+    st.stop()
+
+if not check_login():
+    tela_login()
+
 AREAS = ["todos", "dados", "automacao", "engenharia", "logistica", "atendimento", "financeiro", "parceria", "crm"]
 BADGE_CLASS = {
     "dados":        "badge-dados",
