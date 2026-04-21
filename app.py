@@ -22,11 +22,11 @@ st.markdown("""
         --li-turquesa-dark: #00957A;
         --li-roxo-dark: #4E1F78;
     }
-    .block-container { padding-top: 0 !important; max-width: 1100px; }
+    .block-container { padding-top: 1rem !important; max-width: 1100px; }
     .hero-banner {
         background: linear-gradient(135deg, #00C4A0 0%, #6B2FA0 100%);
         padding: 28px 32px;
-        border-radius: 0 0 16px 16px;
+        border-radius: 16px;
         margin-bottom: 1.5rem;
         color: white;
     }
