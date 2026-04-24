@@ -365,7 +365,6 @@ with tab_catalogo:
                         with col_ed:
                             if st.button("✏️", key=f"edit_{q['id']}", help="Editar query"):
                                 st.session_state["editando_id"] = q["id"]
-                                st.rerun()
 
                     st.code(q["sql_texto"], language="sql")
 
