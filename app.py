@@ -157,6 +157,12 @@ def atualizar_query(query_id, nome, descricao, sql_texto, area, tabelas):
     conn.commit()
     conn.close()
 
+def excluir_query(query_id):
+    conn = get_db()
+    conn.execute("DELETE FROM queries WHERE id=?", (query_id,))
+    conn.commit()
+    conn.close()
+
 def aprovar_query(query_id):
     conn = get_db()
     conn.execute("UPDATE queries SET status='aprovada' WHERE id=?", (query_id,))
@@ -365,6 +371,26 @@ with tab_catalogo:
                         with col_ed:
                             if st.button("✏️", key=f"edit_{q['id']}", help="Editar query"):
                                 st.session_state["editando_id"] = q["id"]
+                                st.session_state[f"confirmar_del_{q['id']}"] = False
+
+                    # Botão excluir fora das colunas para dar espaço
+                    if st.session_state.get(f"confirmar_del_{q['id']}", False):
+                        st.warning("⚠️ Tem certeza que quer excluir essa query? Essa ação não pode ser desfeita.")
+                        col_sim, col_nao, _ = st.columns([1, 1, 4])
+                        with col_sim:
+                            if st.button("🗑️ Sim, excluir", key=f"del_sim_{q['id']}", type="primary"):
+                                excluir_query(q["id"])
+                                st.session_state[f"confirmar_del_{q['id']}"] = False
+                                st.toast("Query excluída!", icon="🗑️")
+                                st.rerun()
+                        with col_nao:
+                            if st.button("Cancelar", key=f"del_nao_{q['id']}"):
+                                st.session_state[f"confirmar_del_{q['id']}"] = False
+                                st.rerun()
+                    else:
+                        if st.button("🗑️ Excluir query", key=f"del_{q['id']}"):
+                            st.session_state[f"confirmar_del_{q['id']}"] = True
+                            st.rerun()
 
                     st.code(q["sql_texto"], language="sql")
 
