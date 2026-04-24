@@ -273,15 +273,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4 = st.columns(4)
 c1.metric("Queries aprovadas", total)
 c2.metric("Times cobertos", areas)
 c3.metric("Usos registrados", usos)
 c4.metric("Aguardando aprovação", pendentes)
-with c5:
-    st.write("")
-    if st.button("＋ Sugerir query", use_container_width=True):
-        st.session_state["aba_ativa"] = "submeter"
 
 st.divider()
 
