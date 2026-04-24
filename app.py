@@ -22,7 +22,7 @@ st.markdown("""
         --li-turquesa-dark: #00957A;
         --li-roxo-dark: #4E1F78;
     }
-    .block-container { padding-top: 1rem !important; max-width: 1100px; }
+    .block-container { padding-top: 2rem !important; max-width: 1100px; }
     .hero-banner {
         background: linear-gradient(135deg, #00C4A0 0%, #6B2FA0 100%);
         padding: 28px 32px;
@@ -49,31 +49,19 @@ st.markdown("""
     .badge-parceria     { background:#FFF0F0; color:#991B1B; }
     .badge-crm          { background:#FFF5ED; color:#92400E; }
     .meta { font-size: 12px; color: #888; margin-top: 6px; }
-    .stButton > button {
-        border-radius: 8px !important;
-    }
+    .stButton > button { border-radius: 8px !important; }
     .stButton > button[kind="primary"] {
-        background-color: var(--li-turquesa) !important;
-        border-color: var(--li-turquesa) !important;
+        background-color: #00C4A0 !important;
+        border-color: #00C4A0 !important;
         color: white !important;
     }
     .stButton > button[kind="primary"]:hover {
-        background-color: var(--li-turquesa-dark) !important;
-        border-color: var(--li-turquesa-dark) !important;
-    }
-    .stTextInput > div > div > input:focus {
-        border-color: var(--li-turquesa) !important;
-        box-shadow: 0 0 0 1px var(--li-turquesa) !important;
-    }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 4px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px 8px 0 0 !important;
+        background-color: #00957A !important;
+        border-color: #00957A !important;
     }
     .stTabs [aria-selected="true"] {
-        color: var(--li-roxo) !important;
-        border-bottom-color: var(--li-roxo) !important;
+        color: #6B2FA0 !important;
+        border-bottom-color: #6B2FA0 !important;
     }
     .info-box {
         background: #E6FAF6;
@@ -82,6 +70,15 @@ st.markdown("""
         border-radius: 0 8px 8px 0;
         font-size: 13px;
         color: #00957A;
+        margin-bottom: 1rem;
+    }
+    .edit-box {
+        background: #F0E8F8;
+        border-left: 3px solid #6B2FA0;
+        padding: 10px 14px;
+        border-radius: 0 8px 8px 0;
+        font-size: 13px;
+        color: #4E1F78;
         margin-bottom: 1rem;
     }
 </style>
@@ -147,6 +144,15 @@ def submeter_query(nome, descricao, sql_texto, area, tabelas, autor):
     conn.execute(
         "INSERT INTO queries (nome, descricao, sql_texto, area, tabelas, autor, status) VALUES (?,?,?,?,?,?,?)",
         (nome, descricao, sql_texto, area, tabelas, autor, "pendente")
+    )
+    conn.commit()
+    conn.close()
+
+def atualizar_query(query_id, nome, descricao, sql_texto, area, tabelas):
+    conn = get_db()
+    conn.execute(
+        "UPDATE queries SET nome=?, descricao=?, sql_texto=?, area=?, tabelas=? WHERE id=?",
+        (nome, descricao, sql_texto, area, tabelas, query_id)
     )
     conn.commit()
     conn.close()
@@ -248,6 +254,7 @@ if not check_login():
 
 # ── Constantes ────────────────────────────────────────────────────────────────
 AREAS = ["todos", "dados", "automacao", "engenharia", "logistica", "atendimento", "financeiro", "parceria", "crm"]
+AREAS_FORM = ["dados", "automacao", "engenharia", "logistica", "atendimento", "financeiro", "parceria", "crm"]
 BADGE_CLASS = {
     "dados": "badge-dados", "automacao": "badge-automacao",
     "engenharia": "badge-engenharia", "logistica": "badge-logistica",
@@ -258,7 +265,7 @@ BADGE_CLASS = {
 # ── Hero Banner ───────────────────────────────────────────────────────────────
 total, areas, usos, pendentes = get_stats()
 
-st.markdown(f"""
+st.markdown("""
 <div class="hero-banner">
     <div class="hero-title">🗄️ Query Hub</div>
     <div class="hero-sub">Repositório central de queries SQL · Loja Integrada · Time de Automação</div>
@@ -277,6 +284,10 @@ with c5:
         st.session_state["aba_ativa"] = "submeter"
 
 st.divider()
+
+# ── Session state para edição ─────────────────────────────────────────────────
+if "editando_id" not in st.session_state:
+    st.session_state["editando_id"] = None
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_catalogo, tab_aprovacao, tab_submeter = st.tabs([
@@ -305,37 +316,80 @@ with tab_catalogo:
         for q in queries:
             badge_cls = BADGE_CLASS.get(q["area"], "badge-dados")
             with st.expander(f"**{q['nome']}**  ·  {q['descricao'] or ''}"):
-                col_info, col_acoes = st.columns([4, 1])
-                with col_info:
-                    st.markdown(
-                        f'<span class="badge {badge_cls}">{q["area"].capitalize()}</span>'
-                        f'<span class="meta">tabelas: {q["tabelas"] or "—"}  ·  autor: {q["autor"] or "—"}  ·  usado {q["usos"]}x</span>',
-                        unsafe_allow_html=True
-                    )
-                with col_acoes:
-                    if st.button("📋 Copiar SQL", key=f"copy_{q['id']}"):
-                        registrar_uso(q["id"])
-                        st.toast("SQL copiado! ✓", icon="✅")
 
-                st.code(q["sql_texto"], language="sql")
+                # ── Modo edição ──
+                if st.session_state["editando_id"] == q["id"]:
+                    st.markdown('<div class="edit-box">✏️ Modo edição — altere os campos e salve</div>', unsafe_allow_html=True)
 
-                if metabase_disponivel():
-                    if st.button("▶ Executar no Metabase", key=f"run_{q['id']}", type="primary"):
-                        with st.spinner("Executando query no StarRocks..."):
-                            df, erro = executar_no_metabase(q["sql_texto"])
-                        if erro:
-                            st.error(f"Erro: {erro}")
-                        else:
-                            st.success(f"{len(df)} linhas retornadas")
-                            st.dataframe(df, use_container_width=True)
-                            csv = df.to_csv(index=False).encode("utf-8")
-                            st.download_button(
-                                "⬇ Baixar CSV",
-                                data=csv,
-                                file_name=f"{q['nome'].replace(' ', '_')}.csv",
-                                mime="text/csv",
-                                key=f"dl_{q['id']}"
-                            )
+                    with st.form(f"edit_form_{q['id']}"):
+                        e_nome     = st.text_input("Nome", value=q["nome"])
+                        e_desc     = st.text_area("Descrição", value=q["descricao"] or "", height=80)
+                        col_ea, col_eb = st.columns(2)
+                        with col_ea:
+                            e_area = st.selectbox("Área", AREAS_FORM,
+                                index=AREAS_FORM.index(q["area"]) if q["area"] in AREAS_FORM else 0,
+                                format_func=lambda x: x.capitalize())
+                        with col_eb:
+                            e_tabelas = st.text_input("Tabelas", value=q["tabelas"] or "")
+                        e_sql = st.text_area("SQL", value=q["sql_texto"], height=200)
+
+                        col_s, col_c = st.columns([1, 1])
+                        with col_s:
+                            salvar = st.form_submit_button("💾 Salvar alterações", type="primary", use_container_width=True)
+                        with col_c:
+                            cancelar = st.form_submit_button("Cancelar", use_container_width=True)
+
+                        if salvar:
+                            if not e_nome or not e_sql:
+                                st.error("Nome e SQL são obrigatórios.")
+                            else:
+                                atualizar_query(q["id"], e_nome, e_desc, e_sql, e_area, e_tabelas)
+                                st.session_state["editando_id"] = None
+                                st.toast("Query atualizada! ✓", icon="✅")
+                                st.rerun()
+                        if cancelar:
+                            st.session_state["editando_id"] = None
+                            st.rerun()
+
+                # ── Modo visualização ──
+                else:
+                    col_info, col_acoes = st.columns([4, 1])
+                    with col_info:
+                        st.markdown(
+                            f'<span class="badge {badge_cls}">{q["area"].capitalize()}</span>'
+                            f'<span class="meta">tabelas: {q["tabelas"] or "—"}  ·  autor: {q["autor"] or "—"}  ·  usado {q["usos"]}x</span>',
+                            unsafe_allow_html=True
+                        )
+                    with col_acoes:
+                        col_cp, col_ed = st.columns(2)
+                        with col_cp:
+                            if st.button("📋", key=f"copy_{q['id']}", help="Copiar SQL"):
+                                registrar_uso(q["id"])
+                                st.toast("SQL copiado! ✓", icon="✅")
+                        with col_ed:
+                            if st.button("✏️", key=f"edit_{q['id']}", help="Editar query"):
+                                st.session_state["editando_id"] = q["id"]
+                                st.rerun()
+
+                    st.code(q["sql_texto"], language="sql")
+
+                    if metabase_disponivel():
+                        if st.button("▶ Executar no Metabase", key=f"run_{q['id']}", type="primary"):
+                            with st.spinner("Executando query no StarRocks..."):
+                                df, erro = executar_no_metabase(q["sql_texto"])
+                            if erro:
+                                st.error(f"Erro: {erro}")
+                            else:
+                                st.success(f"{len(df)} linhas retornadas")
+                                st.dataframe(df, use_container_width=True)
+                                csv = df.to_csv(index=False).encode("utf-8")
+                                st.download_button(
+                                    "⬇ Baixar CSV",
+                                    data=csv,
+                                    file_name=f"{q['nome'].replace(' ', '_')}.csv",
+                                    mime="text/csv",
+                                    key=f"dl_{q['id']}"
+                                )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -431,8 +485,7 @@ with tab_submeter:
             descricao = st.text_area("Descrição", placeholder="O que essa query retorna? Quando usar?", height=80)
             col_a, col_b = st.columns(2)
             with col_a:
-                area = st.selectbox("Time / Área *", ["dados", "automacao", "engenharia", "logistica", "atendimento", "financeiro", "parceria", "crm"],
-                    format_func=lambda x: x.capitalize())
+                area = st.selectbox("Time / Área *", AREAS_FORM, format_func=lambda x: x.capitalize())
             with col_b:
                 tabelas = st.text_input("Tabelas usadas", placeholder="ex: orders, merchants")
             autor     = st.text_input("Seu nome", placeholder="ex: Amanda Lino")
